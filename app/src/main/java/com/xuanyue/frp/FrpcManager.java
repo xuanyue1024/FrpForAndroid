@@ -114,12 +114,8 @@ public class FrpcManager {
                 Log.e(TAG, "设置执行权限失败: " + e.getMessage(), e);
             }
 
-            // 使用app_process启动frpc
+            // 构建命令数组
             String[] cmd = {
-                "/system/bin/app_process",
-                "-Djava.class.path=" + context.getPackageCodePath(),
-                "/system/bin",
-                "--nice-name=frpc",
                 frpcPath,
                 "-c",
                 configPath
@@ -127,17 +123,8 @@ public class FrpcManager {
             
             Log.i(TAG, "执行命令: " + String.join(" ", cmd));
             
-            // 启动进程
-            ProcessBuilder processBuilder = new ProcessBuilder(cmd)
-                .redirectErrorStream(false);
-            
-            // 添加环境变量
-            Map<String, String> env = processBuilder.environment();
-            env.put("HOME", context.getFilesDir().getAbsolutePath());
-            env.put("TMPDIR", context.getCacheDir().getAbsolutePath());
-            env.put("LD_LIBRARY_PATH", context.getApplicationInfo().nativeLibraryDir);
-            
-            process = processBuilder.start();
+            // 使用Runtime.exec启动进程
+            process = Runtime.getRuntime().exec(cmd);
             
             // 先读取一些初始输出
             BufferedReader errorReader = new BufferedReader(
@@ -176,10 +163,8 @@ public class FrpcManager {
             // 开启标准输出流读取线程
             outputThread = new Thread(() -> {
                 try {
-                    BufferedReader reader = new BufferedReader(
-                            new InputStreamReader(process.getInputStream()));
                     String line;
-                    while ((line = reader.readLine()) != null) {
+                    while ((line = outputReader.readLine()) != null) {
                         final String log = line;
                         Log.i(TAG, log);
                         if (logCallback != null) {
@@ -195,10 +180,8 @@ public class FrpcManager {
             // 开启错误输出流读取线程
             errorThread = new Thread(() -> {
                 try {
-                    BufferedReader reader = new BufferedReader(
-                            new InputStreamReader(process.getErrorStream()));
                     String line;
-                    while ((line = reader.readLine()) != null) {
+                    while ((line = errorReader.readLine()) != null) {
                         final String error = line;
                         Log.e(TAG, error);
                         if (logCallback != null) {
