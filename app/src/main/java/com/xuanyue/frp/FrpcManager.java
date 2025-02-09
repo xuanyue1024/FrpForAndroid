@@ -29,8 +29,6 @@ public class FrpcManager {
         this.context = context;
         // 使用应用私有目录
         this.frpcPath = context.getFilesDir() + "/frpc";
-        Log.i(TAG, "应用目录: " + context.getApplicationInfo().dataDir);
-        Log.i(TAG, "frpc路径: " + frpcPath);
     }
 
     public void setLogCallback(LogCallback callback) {
@@ -80,8 +78,7 @@ public class FrpcManager {
         }
     }
 
-    public boolean startFrpc(String configPath) {
-        Log.i(TAG, "开始启动frpc，配置文件路径: " + configPath);
+    public boolean startFrpc() {
         try {
             // 检查frpc文件是否存在
             File frpcFile = new File(frpcPath);
@@ -95,9 +92,9 @@ public class FrpcManager {
             }
             
             // 检查配置文件
-            File configFile = new File(configPath);
+            File configFile = new File(context.getFilesDir(), "frpc.toml");
             if (!configFile.exists()) {
-                String error = "配置文件不存在: " + configPath;
+                String error = "配置文件frpc.toml不存在: ";
                 Log.e(TAG, error);
                 if (logCallback != null) {
                     logCallback.onError(error);
@@ -105,20 +102,18 @@ public class FrpcManager {
                 return false;
             }
 
-            // 设置执行权限
+            /*// 设置执行权限
             try {
                 Process chmodProcess = Runtime.getRuntime().exec("chmod 700 " + frpcPath);
                 int exitCode = chmodProcess.waitFor();
                 Log.i(TAG, "chmod执行结果: " + exitCode);
             } catch (Exception e) {
                 Log.e(TAG, "设置执行权限失败: " + e.getMessage(), e);
-            }
+            }*/
 
             // 构建命令数组
             String[] cmd = {
-                frpcPath,
-                "-c",
-                configPath
+                frpcPath, "-c", configFile.getAbsolutePath()
             };
             
             Log.i(TAG, "执行命令: " + String.join(" ", cmd));
@@ -142,22 +137,6 @@ public class FrpcManager {
             if (outputReader.ready()) {
                 String initialOutput = outputReader.readLine();
                 Log.i(TAG, "frpc初始输出: " + initialOutput);
-            }
-            
-            // 检查进程是否立即退出
-            try {
-                Thread.sleep(100); // 等待100ms
-                int exitCode = process.exitValue(); // 如果进程还在运行，这里会抛出异常
-                // 如果能执行到这里，说明进程已经退出
-                String error = "frpc进程立即退出，退出码: " + exitCode;
-                Log.e(TAG, error);
-                if (logCallback != null) {
-                    logCallback.onError(error);
-                }
-                return false;
-            } catch (IllegalThreadStateException e) {
-                // 进程还在运行，这是我们想要的
-                Log.i(TAG, "frpc进程正在运行");
             }
             
             // 开启标准输出流读取线程
@@ -195,7 +174,7 @@ public class FrpcManager {
             errorThread.start();
             
             return true;
-        } catch (IOException | InterruptedException e) {
+        } catch (IOException e) {
             Log.e(TAG, "启动frpc失败: " + e.getMessage(), e);
             if (logCallback != null) {
                 logCallback.onError("启动frpc失败: " + e.getMessage());
